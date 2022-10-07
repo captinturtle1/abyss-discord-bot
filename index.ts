@@ -22,44 +22,47 @@ client.on('interactionCreate', async interaction => {
         let nospace = address.replace(/\s+/g, '');
         let myArray = nospace.split(",");
         let user = interaction.user.id;
-        if (/^0x[a-fA-F0-9]{40}$/.test(myArray[0])) {
-            // getting current addresses
-            let getParams = {
-                Key: {
-                 "userId": {S: `${user}`}, 
-                },
-                TableName: "userAddresses"
-            };
-
-            ddb.getItem(getParams, function(err, data) {
-                if (err) {
-                    console.log("Error", err);
-                } else {
-                    console.log("Success", data);
-                }
-            });
-
-            let params = {
-                Item: {
-                 "userId": {S: `${user}`}, 
-                 "addresses": {S: `${myArray}`}
-                },
-                TableName: "userAddresses"
-            };
-
-            // Call DynamoDB to add the item to the table
-            ddb.putItem(params, function(err, data) {
-              if (err) {
-                console.log("Error", err);
-                interaction.reply({ content: 'error', ephemeral: true });
-              } else {
-                console.log("Success", data);
-                interaction.reply({ content: 'success', ephemeral: true });
-              }
-            });
-        } else {
-            await interaction.reply({ content: 'invalid address provided', ephemeral: true });
+        for (let i = 0; i < myArray.length; i++) {
+          console.log(myArray[i]);
+          if (!/^0x[a-fA-F0-9]{40}$/.test(myArray[i])) {
+            await interaction.reply({ content: `${myArray[i]} is not valid`, ephemeral: true });
+            return;
+          }
         }
+
+        let noDupe = myArray.filter((item, index) => myArray.indexOf(item) === index);
+        
+        // getting current addresses
+        let getParams = {
+            Key: {
+             "userId": {S: `${user}`}, 
+            },
+            TableName: "userAddresses"
+        }
+        ddb.getItem(getParams, function(err, data) {
+            if (err) {
+                console.log("Error", err);
+            } else {
+                console.log("Success", data);
+            }
+        })
+        let params = {
+            Item: {
+             "userId": {S: `${user}`}, 
+             "addresses": {S: `${noDupe}`}
+            },
+            TableName: "userAddresses"
+        }
+        // Call DynamoDB to add the item to the table
+        ddb.putItem(params, function(err, data) {
+          if (err) {
+            console.log("Error", err);
+            interaction.reply({ content: 'error', ephemeral: true });
+          } else {
+            console.log("Success", data);
+            interaction.reply({ content: 'success', ephemeral: true });
+          }
+        });
 	} else if (interaction.commandName === 'view_wallets') {
         let user = interaction.user.id;
         let params = {
