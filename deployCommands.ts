@@ -12,13 +12,6 @@ const commands = [
 		    	.setDescription('The address you want to add')
 		    	.setRequired(true)),
 	new SlashCommandBuilder()
-        .setName('add_multiple_wallet')
-        .setDescription('Add multiple addresses to list of wallets to track')
-        .addStringOption(option =>
-		    option.setName('addresses')
-		    	.setDescription('The addresses you want to add, seperated with commas')
-		    	.setRequired(true)),
-	new SlashCommandBuilder()
         .setName('view_wallets')
         .setDescription('View list of currently tracked wallets'),
 	new SlashCommandBuilder()

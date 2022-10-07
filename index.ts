@@ -19,8 +19,10 @@ client.on('interactionCreate', async interaction => {
 
 	if (interaction.commandName === 'add_wallet') {
         let address = interaction.options.getString('address');
+        let nospace = address.replace(/\s+/g, '');
+        let myArray = nospace.split(",");
         let user = interaction.user.id;
-        if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        if (/^0x[a-fA-F0-9]{40}$/.test(myArray[0])) {
             // getting current addresses
             let getParams = {
                 Key: {
@@ -29,63 +31,32 @@ client.on('interactionCreate', async interaction => {
                 TableName: "userAddresses"
             };
 
-            let currentAddresses;
-
             ddb.getItem(getParams, function(err, data) {
-                currentAddresses = data.Item.addresses.S;
                 if (err) {
                     console.log("Error", err);
                 } else {
                     console.log("Success", data);
                 }
             });
-            //
 
-
-            // adding addresses
             let params = {
                 Item: {
                  "userId": {S: `${user}`}, 
-                 "addresses": {S: `${currentAddresses}, ${address}`}
+                 "addresses": {S: `${myArray}`}
                 },
                 TableName: "userAddresses"
             };
 
-              // Call DynamoDB to add the item to the table
-              ddb.putItem(params, function(err, data) {
-                if (err) {
-                  console.log("Error", err);
-                  interaction.reply({ content: 'error', ephemeral: true });
-                } else {
-                  console.log("Success", data);
-                  interaction.reply({ content: 'success', ephemeral: true });
-                }
-              });
-        } else {
-            await interaction.reply({ content: 'invalid address provided', ephemeral: true });
-        }
-	} else if (interaction.commandName === 'add_multiple_wallet') {
-        let address = interaction.options.getString('address');
-        let user = interaction.user.id;
-        if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
-            let params = {
-                Item: {
-                 "userId": {S: `${user}`}, 
-                 "addresses": {S: `${address}`}
-                },
-                TableName: "userAddresses"
-            };
-
-              // Call DynamoDB to add the item to the table
-              ddb.putItem(params, function(err, data) {
-                if (err) {
-                  console.log("Error", err);
-                  interaction.reply({ content: 'error', ephemeral: true });
-                } else {
-                  console.log("Success", data);
-                  interaction.reply({ content: 'success', ephemeral: true });
-                }
-              });
+            // Call DynamoDB to add the item to the table
+            ddb.putItem(params, function(err, data) {
+              if (err) {
+                console.log("Error", err);
+                interaction.reply({ content: 'error', ephemeral: true });
+              } else {
+                console.log("Success", data);
+                interaction.reply({ content: 'success', ephemeral: true });
+              }
+            });
         } else {
             await interaction.reply({ content: 'invalid address provided', ephemeral: true });
         }
@@ -100,17 +71,41 @@ client.on('interactionCreate', async interaction => {
 
         // Call DynamoDB to read the item from the table
         ddb.getItem(params, function(err, data) {
-            let justAddress = data.Item.addresses.S;
             if (err) {
                 console.log("Error", err);
                 interaction.reply({ content: 'error', ephemeral: true });
             } else {
-            
-                console.log("Success", data);
-                interaction.reply({ content: `${justAddress}`, ephemeral: true });
+                try {
+                    let justAddress = data.Item.addresses.S;
+                    console.log("Success", data);
+                    interaction.reply({ content: `${justAddress}`, ephemeral: true });
+                } catch(err) {
+                    console.log('no wallets found');
+                    interaction.reply({ content: 'no wallets found', ephemeral: true });
+                }
             }
         });
-	}
+	} else if (interaction.commandName === 'remove_all_wallets') {
+        let user = interaction.user.id;
+        let params = {
+            Key: {
+             "userId": {S: `${user}`},
+            },
+            TableName: "userAddresses"
+        };
+
+        // Call DynamoDB to delete the item from the table
+        ddb.deleteItem(params, function(err, data) {
+          if (err) {
+            console.log("Error", err);
+            interaction.reply({ content: 'error', ephemeral: true });
+          } else {
+            console.log("Success", data);
+            interaction.reply({ content: 'success', ephemeral: true });
+          }
+        });
+
+    }
 });
 
 
