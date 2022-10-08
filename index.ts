@@ -1,15 +1,16 @@
-const AWS = require('aws-sdk');
-const { Client, GatewayIntentBits } = require('discord.js');
-const dotenv = require('dotenv');
-dotenv.config();
+var { Client, GatewayIntentBits } = require('discord.js');
+var AWS = require('aws-sdk');
+var dotenv = require('dotenv');
 
+// init aws
 AWS.config.update({region: 'us-west-2'});
 var ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 
-// Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// init dotenv
+dotenv.config();
 
-// When the client is ready, run this code (only once)
+// init discord client
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.once('ready', () => {
 	console.log('Ready!');
 });
@@ -102,36 +103,86 @@ client.on('interactionCreate', async interaction => {
                 console.log("Error", err);
                 interaction.reply({ content: 'error', ephemeral: true });
             } else {
-                try {
+                if (Object.keys(data).length !== 0) {
                     let justAddress = data.Item.addresses.S;
+                    let nospace = justAddress.replace(/,/g, '\n');
                     console.log("Success", data);
-                    interaction.reply({ content: `${justAddress}`, ephemeral: true });
-                } catch(err) {
+                    interaction.reply({ content: `${nospace}`, ephemeral: true });
+                } else {
                     console.log('no wallets found');
                     interaction.reply({ content: 'no wallets found', ephemeral: true });
                 }
             }
         });
 	} else if (interaction.commandName === 'remove_all_wallets') {
-        let user = interaction.user.id;
-        let params = {
-            Key: {
-             "userId": {S: `${user}`},
-            },
-            TableName: "userAddresses"
-        };
+    let user = interaction.user.id;
+    let params = {
+        Key: {
+         "userId": {S: `${user}`},
+        },
+        TableName: "userAddresses"
+    };
 
-        // Call DynamoDB to delete the item from the table
-        ddb.deleteItem(params, function(err, data) {
-          if (err) {
+    // Call DynamoDB to delete the item from the table
+    ddb.deleteItem(params, function(err, data) {
+      if (err) {
+        console.log("Error", err);
+        interaction.reply({ content: 'error', ephemeral: true });
+      } else {
+        console.log("Success", data);
+        interaction.reply({ content: 'success', ephemeral: true });
+      }
+    });
+
+    } else if (interaction.commandName === 'remove_wallet') {
+      let user = interaction.user.id;
+      let getParams = {
+        Key: {
+         "userId": {S: `${user}`}, 
+        },
+        TableName: "userAddresses"
+      };
+
+      ddb.getItem(getParams, function(err, data) {
+        if (err) {
             console.log("Error", err);
             interaction.reply({ content: 'error', ephemeral: true });
+        } else {
+          if (Object.keys(data).length !== 0) {
+            let address = interaction.options.getString('address');
+            let currentAddresses = data.Item.addresses.S.split(",");
+            if (currentAddresses.includes(address)) {
+              let found = currentAddresses.findIndex(element => element === address);
+              console.log(found);
+              console.log(`${currentAddresses} is before splice`);
+              currentAddresses.splice(found, 1);
+              console.log(`${currentAddresses} is after splice`);
+              let params = {
+                Item: {
+                 "userId": {S: `${user}`}, 
+                 "addresses": {S: `${currentAddresses}`}
+                },
+                TableName: "userAddresses"
+              }
+    
+              // Call DynamoDB to add the item to the table
+              ddb.putItem(params, function(err, data) {
+                if (err) {
+                  console.log("Error", err);
+                  interaction.reply({ content: 'error', ephemeral: true });
+                } else {
+                  console.log("Success", data);
+                  interaction.reply({ content: `removed ${address}`, ephemeral: true });
+                }
+              });
+            } else {
+              interaction.reply({ content: 'wallet not being tracked', ephemeral: true });
+            };
           } else {
-            console.log("Success", data);
-            interaction.reply({ content: 'success', ephemeral: true });
-          }
-        });
-
+            interaction.reply({ content: 'no wallets being tracked', ephemeral: true });
+          };
+        }
+      });
     }
 });
 
