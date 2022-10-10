@@ -1,6 +1,6 @@
-var { SlashCommandBuilder, Routes } = require('discord.js');
-var { REST } = require('@discordjs/rest');
-var dotenv = require('dotenv');
+import { SlashCommandBuilder, Routes } from 'discord.js';
+import { REST } from '@discordjs/rest';
+import dotenv from 'dotenv';
 dotenv.config();
 
 const commands = [
