@@ -11,9 +11,11 @@ const commands = [
 		    option.setName('address')
 		    	.setDescription('The address you want to add')
 		    	.setRequired(true)),
+				
 	new SlashCommandBuilder()
         .setName('view_wallets')
         .setDescription('View list of currently tracked wallets'),
+		
 	new SlashCommandBuilder()
         .setName('remove_wallet')
         .setDescription('Removed currently tracked wallet')
@@ -21,9 +23,18 @@ const commands = [
 		    option.setName('address')
 		    	.setDescription('The address you want to remove')
 		    	.setRequired(true)),
+
 	new SlashCommandBuilder()
         .setName('remove_all_wallets')
-        .setDescription('Removed currently tracked wallets')
+        .setDescription('Removed currently tracked wallets'),
+
+	new SlashCommandBuilder()
+        .setName('check_profit')
+        .setDescription('Check profit accross tracked wallets for a single collection')
+        .addStringOption(option =>
+		    option.setName('contractaddress')
+		    	.setDescription('The collection contract you want to check')
+		    	.setRequired(true)),
 ]
 	.map(command => command.toJSON());
 
