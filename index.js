@@ -8,6 +8,10 @@ import remove_all_wallets from './commands/remove_all_wallets.js';
 import remove_wallet from './commands/remove_wallet.js';
 import check_profit from './commands/check_profit.js';
 
+import calculate_gas_range from './commands/calculate_gas_range.js';
+import calculate_gas_legacy from './commands/calculate_gas_legacy.js';
+import calculate_gas from './commands/calculate_gas.js';
+
 // init aws
 AWS.config.update({region: 'us-west-2'});
 const ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
@@ -34,6 +38,12 @@ client.on('interactionCreate', async interaction => {
     remove_wallet(interaction, ddb);
   } else if (interaction.commandName === 'check_profit') {
     check_profit(interaction, ddb);
+  } else if (interaction.commandName === 'calculate_gas_range') {
+    calculate_gas_range(interaction);
+  } else if (interaction.commandName === 'calculate_gas_legacy') {
+    calculate_gas_legacy(interaction);
+  } else if (interaction.commandName === 'calculate_gas') {
+    calculate_gas(interaction);
   }
 });
 

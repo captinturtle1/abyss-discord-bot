@@ -35,6 +35,42 @@ const commands = [
 		    option.setName('contractaddress')
 		    	.setDescription('The collection contract you want to check')
 		    	.setRequired(true)),
+
+
+				
+	new SlashCommandBuilder()
+        .setName('calculate_gas_range')
+        .setDescription('gives transaction cost at different gwei prices given the gas limit')
+        .addIntegerOption(option =>
+		    option.setName('gas_limit')
+		    	.setDescription('The gas limit you want to calculate')
+		    	.setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('calculate_gas_legacy')
+        .setDescription('gives transaction cost with specific gwei using legacy transaction type')
+        .addIntegerOption(option =>
+		    option.setName('gwei')
+		    	.setDescription('The gwei you want calculate')
+		    	.setRequired(true))
+        .addIntegerOption(option =>
+		    option.setName('gas_limit')
+		    	.setDescription('The gas limit you want to calculate')
+		    	.setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('calculate_gas')
+        .setDescription('gives transaction cost with specific gwei and priority using EIP1559 transaction type')
+        .addIntegerOption(option =>
+		    option.setName('gwei')
+		    	.setDescription('The gwei you want calculate')
+		    	.setRequired(true))
+        .addIntegerOption(option =>
+		    option.setName('priority_fee')
+		    	.setDescription('The priority fee you want to calculate')
+		    	.setRequired(true))
+        .addIntegerOption(option =>
+		    option.setName('gas_limit')
+		    	.setDescription('The gas limit you want to calculate')
+		    	.setRequired(true)),
 ]
 	.map(command => command.toJSON());
 
