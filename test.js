@@ -11,9 +11,7 @@ const alchemyConfig = {
 };
 const alchemy = new Alchemy(alchemyConfig);
 
-const contractAddress = "0x86913dbe6794c2f8279598b7f88fa7127c8cd7f9".toLowerCase();
 const userAddress = "0x894c3F27a6359B7d4667F9669E98E27786EB0AbF".toLowerCase();
-const zeroAddress = "0x0000000000000000000000000000000000000000".toLowerCase();
 
 let profitTable = {
   totalMoneyIn: 0,
@@ -31,7 +29,8 @@ let profitTable = {
 };
 
 
-function getNftsOut() {
+export default function getNftsOut(contractAddress, interaction) {
+  interaction.reply('1 sec');
   // checks nfts that came out of wallet
   alchemy.core.getAssetTransfers({
     fromBlock: "0x0",
@@ -56,14 +55,14 @@ function getNftsOut() {
         }
         if (profitTable.totalAmountSold == value.transfers.length) {
           console.log("done tracking out");
-          getNftsIn();
+          getNftsIn(contractAddress, interaction);
         }
       }).catch(console.error);
     }
   }).catch(console.log);
 }
 
-function getNftsIn() {
+function getNftsIn(contractAddress, interaction) {
 // checks nfts that came into wallet
   alchemy.core.getAssetTransfers({
     fromBlock: "0x0",
@@ -83,7 +82,7 @@ function getNftsIn() {
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
           if (response.result[j].hash == value.transfers[i].hash) {
             // checks if minted or somewhere else
-            if (value.transfers[i].from == zeroAddress) {
+            if (value.transfers[i].from == "0x0000000000000000000000000000000000000000") {
               // if minted
               if (checkedTxs.includes(response.result[j].hash) == false) {
                 let mintCost = response.result[j].value.toString() / 1000000000000000000;
@@ -110,14 +109,14 @@ function getNftsIn() {
         }
         if (profitTable.totalAmountBoughtSecondary + profitTable.totalAmountMinted == value.transfers.length) {
           console.log("done tracking in");
-          getFloor()
+          getFloor(contractAddress, interaction)
         }
       }).catch(console.error);
     }
   }).catch(console.log);
 }
 
-function getFloor() {
+function getFloor(contractAddress, interaction) {
   alchemy.nft
   .getFloorPrice(contractAddress)
   .then(response => {
@@ -128,8 +127,7 @@ function getFloor() {
       profitTable.unrealizedProfit = profitTable.currentlyHeld * profitTable.currentFloor;
       profitTable.realizedProfit = profitTable.totalMoneyIn - (profitTable.buyInCost + profitTable.buyInGasFee + profitTable.mintCost + profitTable.mintGasFees);
       console.log(profitTable);
+      interaction.editReply(`totalMoneyIn ${profitTable.totalMoneyIn}\nmintCost ${profitTable.mintCost}\nmintGasFees ${profitTable.mintGasFees}\nbuyInCost ${profitTable.buyInCost}\nbuyInGasFee ${profitTable.buyInGasFee}\ntotalAmountSold ${profitTable.totalAmountSold}\ntotalAmountMinted ${profitTable.totalAmountMinted}\ntotalAmountBoughtSecondary ${profitTable.totalAmountBoughtSecondary}\ncurrentlyHeld ${profitTable.currentlyHeld}\ncurrentFloor ${profitTable.currentFloor}\nunrealizedProfit ${profitTable.unrealizedProfit}\nrealizedProfit ${profitTable.realizedProfit}`);
     });
   });
 }
-
-getNftsOut();
