@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const alchemyConfig = {
-  apiKey: "demo",
+  apiKey: process.env.ALCHEMY_KEY,
   network: Network.ETH_MAINNET,
 };
 const alchemy = new Alchemy(alchemyConfig);
@@ -21,14 +21,15 @@ let profitTable = {
   mintGasFees: 0,
   buyInCost: 0,
   buyInGasFee: 0,
-  totalAmountHeld: 0,
   totalAmountSold: 0,
   totalAmountMinted: 0,
   totalAmountBoughtSecondary: 0,
+  currentlyHeld: 0,
 };
 
+
 // checks nfts that came out of wallet
-await alchemy.core.getAssetTransfers({
+alchemy.core.getAssetTransfers({
   fromBlock: "0x0",
   fromAddress: `${userAddress}`,
   contractAddresses: [`${contractAddress}`],
@@ -54,36 +55,53 @@ await alchemy.core.getAssetTransfers({
   }
 }).catch(console.log);
 
+
 // checks nfts that came into wallet
-await alchemy.core.getAssetTransfers({
+alchemy.core.getAssetTransfers({
   fromBlock: "0x0",
   contractAddresses: [`${contractAddress}`],
   toAddress: `${userAddress}`,
   excludeZeroValue: false,
   category: ["erc721", "erc1155"],
 }).then(value => {
+  let checkedTxs = [];
   for (let i = 0; i < value.transfers.length; i++) {
+    let blocknum = parseInt(value.transfers[i].blockNum, 16)
     // gets specific transaction details
-    alchemy.core
-    .getTransaction(value.transfers[i].hash)
-    .then(response =>{
-      // checks if minted or somewhere else
-      if (response.from == zeroAddress) {
-        // if minted
-        console.log(response);
-        let mintCost = response.value.toString() / 1000000000000000000;
-        profitTable.mintCost += mintCost;
-        profitTable.totalAmountMinted += 1;
-        console.log(profitTable);
-      } else {
-        // if bought secondary
-        console.log(response);
-        let secondaryCost = response.value.toString() / 1000000000000000000;
-        profitTable.buyInCost += secondaryCost;
-        profitTable.totalAmountBoughtSecondary += 1;
-        console.log(profitTable);
-      };
+    fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
+    .then(response => response.json())
+    .then(response => {
+      for (let j = 0; j < response.result.length; j++) {
+        // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
+        if (response.result[j].hash == value.transfers[i].hash) {
+          // checks if minted or somewhere else
+          if (value.transfers[i].from == zeroAddress) {
+            // if minted
+            if (checkedTxs.includes(response.result[j].hash) == false) {
+              let mintCost = response.result[j].value.toString() / 1000000000000000000;
+              let mintGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
+              profitTable.mintGasFees += mintGasCost;
+              profitTable.mintCost += mintCost;
+            }
+            profitTable.totalAmountMinted += 1;
+            checkedTxs.push(response.result[j].hash);
+            console.log(profitTable);
+          } else {
+            // if bought secondary
+            if (checkedTxs.includes(response.result[j].hash) == false) {
+              let secondaryCost = response.result[j].value / 1000000000000000000;
+              let buyinGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
+              profitTable.buyInGasFee += buyinGasCost;
+              profitTable.buyInCost += secondaryCost;
+            }
+            profitTable.totalAmountBoughtSecondary += 1;
+            checkedTxs.push(response.result[j].hash);
+            console.log(profitTable);
+          };
+        } else {
+          console.log("no match...");
+        }
+      }
     }).catch(console.error);
   }
 }).catch(console.log);
-
