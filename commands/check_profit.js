@@ -13,7 +13,7 @@ const alchemy = new Alchemy(alchemyConfig);
 
 //const userAddress = "0x894c3F27a6359B7d4667F9669E98E27786EB0AbF".toLowerCase();
 
-export default function check_profit(interaction, ddb) {
+export default async function check_profit(interaction, ddb) {
 
   let profitTable = {
     totalMoneyIn: 0,
@@ -30,24 +30,42 @@ export default function check_profit(interaction, ddb) {
     realizedProfit: 0,
   };
 
-  interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ ephemeral: true });
   let user = interaction.user.id;
-    let params = {
-        Key: {
-         "userId": {S: `${user}`}, 
-        },
-        TableName: "userAddresses"
-    };
+  let params = {
+      Key: {
+       "userId": {S: `${user}`}, 
+      },
+      TableName: "userAddresses"
+  };
   ddb.getItem(params, function(err, data) {
     if (err) {
         console.log("Error", err);
-        interaction.reply({ content: 'error', ephemeral: true });
+        interaction.editReply({ content: 'error', ephemeral: true });
     } else {
         if (Object.keys(data).length !== 0) {
             let justAddress = data.Item.addresses.S;
             let totalAddressArray = justAddress.split(',')
             console.log("Success", totalAddressArray);
-            getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[0].toLowerCase());
+
+            /*
+            let i = 0;
+            function myLoop() {
+            	setTimeout(function() {
+            		console.log("loop!")
+                getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
+            		if (i == totalAddressArray.length-1){
+            			console.log("done");
+            		}
+            		if (i < totalAddressArray.length-1) {
+            		  myLoop();
+            		}
+                i++;
+            	}, 1000)
+            }
+            myLoop();*/
+
+            getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[0].toLowerCase(), 0);
         } else {
             console.log('no wallets found');
             interaction.editReply({ content: 'no wallets found', ephemeral: true });
@@ -57,7 +75,7 @@ export default function check_profit(interaction, ddb) {
 }
 
 
-function getNftsOut(interaction, totalAddressArray, profitTable, userAddress) {
+function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, currentAddressIndex) {
   let contractAddress = interaction.options.getString('contractaddress');
   console.log("getting stuff");
   // checks nfts that came out of wallet
@@ -84,14 +102,14 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress) {
         }
         if (profitTable.totalAmountSold == value.transfers.length) {
           console.log("done tracking out");
-          getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
+          getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
         }
       }).catch(console.error);
     }
   }).catch(console.log);
 }
 
-function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress) {
+function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex) {
 // checks nfts that came into wallet
   alchemy.core.getAssetTransfers({
     fromBlock: "0x0",
@@ -100,6 +118,7 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
   }).then(value => {
+    console.log('alchemy', value);
     let checkedTxs = [];
     for (let i = 0; i < value.transfers.length; i++) {
       let blocknum = parseInt(value.transfers[i].blockNum, 16)
@@ -107,6 +126,7 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
       fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
+        console.log('etherscan', response);
         for (let j = 0; j < response.result.length; j++) {
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
           if (response.result[j].hash == value.transfers[i].hash) {
@@ -138,6 +158,9 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
         }
         if (profitTable.totalAmountBoughtSecondary + profitTable.totalAmountMinted == value.transfers.length) {
           console.log("done tracking in");
+          if (currentAddressIndex == totalAddressArray.length-1){
+            console.log("done");
+          }
           getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress)
         }
       }).catch(console.error);
@@ -161,7 +184,6 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
 	      .setTitle('Your profit info')
 	      .setThumbnail('https://www.abyssfnf.com/banner.png')
 	      .addFields(
-          { name: '\u200B', value: '\u200B' },
 	      	{ name: 'Total minted', value: `${profitTable.totalAmountMinted}`, inline: true },
 	      	{ name: 'Mint cost', value: `${profitTable.mintCost.toPrecision(5)}`, inline: true },
           { name: 'Mint fee', value: `${profitTable.mintGasFees.toPrecision(5)}`, inline: true },
