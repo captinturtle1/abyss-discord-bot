@@ -7,7 +7,6 @@ import view_wallets from './commands/view_wallets.js';
 import remove_all_wallets from './commands/remove_all_wallets.js';
 import remove_wallet from './commands/remove_wallet.js';
 import check_profit from './commands/check_profit.js';
-import getNftsOut from './test.js';
 
 import calculate_gas_range from './commands/calculate_gas_range.js';
 import calculate_gas_legacy from './commands/calculate_gas_legacy.js';
@@ -38,7 +37,7 @@ client.on('interactionCreate', async interaction => {
   } else if (interaction.commandName === 'remove_wallet') {
     remove_wallet(interaction, ddb);
   } else if (interaction.commandName === 'check_profit') {
-    getNftsOut(interaction.options.getString('contractaddress'), interaction);
+    check_profit(interaction, ddb);
   } else if (interaction.commandName === 'calculate_gas_range') {
     calculate_gas_range(interaction);
   } else if (interaction.commandName === 'calculate_gas_legacy') {
