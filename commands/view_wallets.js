@@ -1,3 +1,5 @@
+import { codeBlock } from 'discord.js';
+
 export default function view_wallets(interaction, ddb) {
     let user = interaction.user.id;
     let params = {
@@ -17,7 +19,7 @@ export default function view_wallets(interaction, ddb) {
                 let justAddress = data.Item.addresses.S;
                 let nospace = justAddress.replace(/,/g, '\n');
                 console.log("Success", data);
-                interaction.reply({ content: `${nospace}`, ephemeral: true });
+                interaction.reply({ content: `${codeBlock(nospace)}`, ephemeral: true });
             } else {
                 console.log('no wallets found');
                 interaction.reply({ content: 'no wallets found', ephemeral: true });
