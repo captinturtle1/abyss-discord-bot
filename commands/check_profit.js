@@ -30,7 +30,7 @@ export default async function check_profit(interaction, ddb) {
     realizedProfit: 0,
   };
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply();
   let user = interaction.user.id;
   let params = {
       Key: {
@@ -41,31 +41,26 @@ export default async function check_profit(interaction, ddb) {
   ddb.getItem(params, function(err, data) {
     if (err) {
         console.log("Error", err);
-        interaction.editReply({ content: 'error', ephemeral: true });
+        interaction.editReply({ content: 'error'});
     } else {
         if (Object.keys(data).length !== 0) {
             let justAddress = data.Item.addresses.S;
             let totalAddressArray = justAddress.split(',')
             console.log("Success", totalAddressArray);
-
-            /*
             let i = 0;
             function myLoop() {
             	setTimeout(function() {
             		console.log("loop!")
                 getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
-            		if (i == totalAddressArray.length-1){
-            			console.log("done");
-            		}
             		if (i < totalAddressArray.length-1) {
             		  myLoop();
             		}
                 i++;
-            	}, 1000)
+            	}, 10000 * (i + 1))
             }
-            myLoop();*/
+            myLoop();
 
-            getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[0].toLowerCase(), 0);
+            //getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[0].toLowerCase(), 0);
         } else {
             console.log('no wallets found');
             interaction.editReply({ content: 'no wallets found', ephemeral: true });
@@ -78,6 +73,7 @@ export default async function check_profit(interaction, ddb) {
 function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, currentAddressIndex) {
   let contractAddress = interaction.options.getString('contractaddress');
   console.log("getting stuff");
+
   // checks nfts that came out of wallet
   alchemy.core.getAssetTransfers({
     fromBlock: "0x0",
@@ -86,13 +82,16 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
   }).then( value => {
+
     // for each nft transfered in
     for (let i = 0; i < value.transfers.length; i++) {
+
       // calls etherscan interal tx api for each transaction
-      fetch(`https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${value.transfers[i].hash}&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
+      setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${value.transfers[i].hash}&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
         for (let j = 0; j < response.result.length; j++) {
+
           // checks each internal tx to make sure its the one with the funds going to user wallet
           if (response.result[j].to == userAddress) {
             let soldInEth = response.result[j].value / 1000000000000000000;
@@ -102,14 +101,15 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
         }
         if (profitTable.totalAmountSold == value.transfers.length) {
           console.log("done tracking out");
-          getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
+            getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
         }
-      }).catch(console.error);
+      }).catch(console.error); }, 500 * (i + 1));
     }
   }).catch(console.log);
 }
 
 function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex) {
+
 // checks nfts that came into wallet
   alchemy.core.getAssetTransfers({
     fromBlock: "0x0",
@@ -118,21 +118,25 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
   }).then(value => {
-    console.log('alchemy', value);
+    console.log(value);
     let checkedTxs = [];
     for (let i = 0; i < value.transfers.length; i++) {
       let blocknum = parseInt(value.transfers[i].blockNum, 16)
+
       // gets specific transaction details
-      fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
+      setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
-        console.log('etherscan', response);
+        console.log(response);
         for (let j = 0; j < response.result.length; j++) {
+
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
           if (response.result[j].hash == value.transfers[i].hash) {
+
             // checks if minted or somewhere else
             if (value.transfers[i].from == "0x0000000000000000000000000000000000000000") {
               // if minted
+
               if (checkedTxs.includes(response.result[j].hash) == false) {
                 let mintCost = response.result[j].value.toString() / 1000000000000000000;
                 let mintGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
@@ -142,7 +146,8 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
               profitTable.totalAmountMinted += 1;
               checkedTxs.push(response.result[j].hash);
             } else {
-              // if bought secondary
+              // if somewhere else
+
               if (checkedTxs.includes(response.result[j].hash) == false) {
                 let secondaryCost = response.result[j].value / 1000000000000000000;
                 let buyinGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
@@ -156,14 +161,16 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
             console.log("no match...");
           }
         }
-        if (profitTable.totalAmountBoughtSecondary + profitTable.totalAmountMinted == value.transfers.length) {
+        if (i == value.transfers.length-1) {
           console.log("done tracking in");
+          console.log(currentAddressIndex, totalAddressArray.length-1);
           if (currentAddressIndex == totalAddressArray.length-1){
             console.log("done");
+            getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
           }
-          getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress)
+          //getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
         }
-      }).catch(console.error);
+      }).catch(console.error); }, 500 * (i + 1));
     }
   }).catch(console.log);
 }
@@ -201,7 +208,7 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
 	      )
 	      .setTimestamp()
 	      .setFooter({ text: 'by captinturtle'});
-        interaction.editReply({ embeds: [exampleEmbed], ephemeral: true });
+        interaction.editReply({ embeds: [exampleEmbed] });
     });
   });
 }
