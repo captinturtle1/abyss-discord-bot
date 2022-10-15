@@ -32,7 +32,7 @@ const commands = [
         .setName('check_profit')
         .setDescription('Check profit accross tracked wallets for a single collection')
         .addStringOption(option =>
-		    option.setName('contractaddress')
+		    option.setName('contract_address')
 		    	.setDescription('The collection contract you want to check')
 		    	.setRequired(true)),
 

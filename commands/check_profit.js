@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, userMention  } from 'discord.js';
 import { Alchemy, Network } from "alchemy-sdk";
 import dotenv from 'dotenv';
 
@@ -11,67 +11,72 @@ const alchemyConfig = {
 };
 const alchemy = new Alchemy(alchemyConfig);
 
-//const userAddress = "0x894c3F27a6359B7d4667F9669E98E27786EB0AbF".toLowerCase();
+let currentlyBeingUsed = false;
 
 export default async function check_profit(interaction, ddb) {
-
-  let profitTable = {
-    totalMoneyIn: 0,
-    mintCost: 0,
-    mintGasFees: 0,
-    buyInCost: 0,
-    buyInGasFee: 0,
-    totalAmountSold: 0,
-    totalAmountMinted: 0,
-    totalAmountBoughtSecondary: 0,
-    currentlyHeld: 0,
-    currentFloor: 0,
-    unrealizedProfit: 0,
-    realizedProfit: 0,
-  };
-
-  await interaction.deferReply();
-  let user = interaction.user.id;
-  let params = {
+  if (!currentlyBeingUsed) {
+    currentlyBeingUsed = true;
+  
+    let profitTable = {
+      totalMoneyIn: 0,
+      mintCost: 0,
+      mintGasFees: 0,
+      buyInCost: 0,
+      buyInGasFee: 0,
+      totalAmountSold: 0,
+      totalAmountMinted: 0,
+      totalAmountBoughtSecondary: 0,
+      currentlyHeld: 0,
+      currentFloor: 0,
+      unrealizedProfit: 0,
+      realizedProfit: 0,
+    };
+    
+    await interaction.deferReply();
+    let user = interaction.user.id;
+    let params = {
       Key: {
        "userId": {S: `${user}`}, 
       },
       TableName: "userAddresses"
-  };
-  ddb.getItem(params, function(err, data) {
-    if (err) {
+    };
+    ddb.getItem(params, function(err, data) {
+      if (err) {
         console.log("Error", err);
-        interaction.editReply({ content: 'error'});
-    } else {
+        interaction.editReply({ content: 'error: unable to access wallets'});
+        currentlyBeingUsed = false;
+      } else {
         if (Object.keys(data).length !== 0) {
-            let justAddress = data.Item.addresses.S;
-            let totalAddressArray = justAddress.split(',')
-            console.log("Success", totalAddressArray);
-            let i = 0;
-            function myLoop() {
-            	setTimeout(function() {
-            		console.log("loop!")
-                getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
-            		if (i < totalAddressArray.length-1) {
-            		  myLoop();
-            		}
-                i++;
-            	}, 10000 * (i + 1))
-            }
-            myLoop();
-
-            //getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[0].toLowerCase(), 0);
+          let justAddress = data.Item.addresses.S;
+          let totalAddressArray = justAddress.split(',')
+          console.log("Success", totalAddressArray);
+          let i = 0;
+          function myLoop() {
+          	setTimeout(function() {
+          		console.log("loop!")
+              getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
+          		if (i < totalAddressArray.length-1) {
+          		  myLoop();
+          		}
+              i++;
+          	}, 10000 * (i + 1))
+          }
+          myLoop();
         } else {
-            console.log('no wallets found');
-            interaction.editReply({ content: 'no wallets found', ephemeral: true });
+          console.log('no wallets found');
+          interaction.editReply({ content: 'error: no wallets found', ephemeral: true });
+          currentlyBeingUsed = false;
         }
-    }
-});
+      }
+    });
+  } else {
+    await interaction.reply('Currently being used, try again in a bit.');
+  }
 }
 
 
 function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, currentAddressIndex) {
-  let contractAddress = interaction.options.getString('contractaddress');
+  let contractAddress = interaction.options.getString('contract_address');
   console.log("getting stuff");
 
   // checks nfts that came out of wallet
@@ -103,9 +108,17 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
           console.log("done tracking out");
             getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
         }
-      }).catch(console.error); }, 500 * (i + 1));
+      }).catch(err => {
+        console.error(err)
+        interaction.editReply({ content: 'error: error accessing api 1', ephemeral: true });
+        currentlyBeingUsed = false;
+      }); }, 500 * (i + 1));
     }
-  }).catch(console.log);
+  }).catch(err => {
+    console.error(err)
+    interaction.editReply({ content: 'error: error accessing api 2', ephemeral: true });
+    currentlyBeingUsed = false;
+  });
 }
 
 function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex) {
@@ -118,7 +131,6 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
   }).then(value => {
-    console.log(value);
     let checkedTxs = [];
     for (let i = 0; i < value.transfers.length; i++) {
       let blocknum = parseInt(value.transfers[i].blockNum, 16)
@@ -127,7 +139,6 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
       setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
-        console.log(response);
         for (let j = 0; j < response.result.length; j++) {
 
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
@@ -170,16 +181,25 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
           }
           //getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
         }
-      }).catch(console.error); }, 500 * (i + 1));
+      }).catch(err => {
+        console.error(err)
+        interaction.editReply({ content: 'error: error accessing api 3', ephemeral: true });
+        currentlyBeingUsed = false;
+      }); }, 500 * (i + 1));
     }
-  }).catch(console.log);
+  }).catch(err => {
+    console.error(err)
+    interaction.editReply({ content: 'error: error accessing api 4', ephemeral: true });
+    currentlyBeingUsed = false;
+  });
 }
 
 function getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress) {
-  alchemy.nft
-  .getFloorPrice(contractAddress)
-  .then(response => {
-    profitTable.currentFloor = response.openSea.floorPrice;
+  let options = {method: 'GET', headers: {accept: '*/*', 'x-api-key': `${process.env.RESERVOIR_KEY}`}};
+  fetch(`https://api.reservoir.tools/collections/v5?id=${contractAddress}&includeTopBid=false&sortBy=allTimeVolume&limit=20`, options)
+    .then(response => response.json())
+    .then(response => {
+    profitTable.currentFloor = response.collections[0].floorAsk.price.amount.decimal
     alchemy.core.getTokenBalances(userAddress, [contractAddress]).then(value => {
       let amountOwned = parseInt(value.tokenBalances[0].tokenBalance, 16)
       profitTable.currentlyHeld = amountOwned;
@@ -188,8 +208,10 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
       console.log(profitTable);
       const exampleEmbed = new EmbedBuilder()
 	      .setColor([15, 23, 42])
-	      .setTitle('Your profit info')
-	      .setThumbnail('https://www.abyssfnf.com/banner.png')
+	      .setTitle(response.collections[0].name)
+        .setURL(`https://opensea.io/collection/${response.collections[0].slug}`)
+        .setAuthor({ name: 'Profit calculator', iconURL: 'https://www.abyssfnf.com/logo.png' })
+	      .setThumbnail(response.collections[0].image)
 	      .addFields(
 	      	{ name: 'Total minted', value: `${profitTable.totalAmountMinted}`, inline: true },
 	      	{ name: 'Mint cost', value: `${profitTable.mintCost.toPrecision(5)}`, inline: true },
@@ -207,8 +229,17 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
           { name: 'Wallets checked', value: `${totalAddressArray.length}` },
 	      )
 	      .setTimestamp()
-	      .setFooter({ text: 'by captinturtle'});
-        interaction.editReply({ embeds: [exampleEmbed] });
+	      .setFooter({ text: 'bot by captinturtle'});
+        currentlyBeingUsed = false;
+        interaction.editReply({ content: `${userMention(interaction.user.id)}`, embeds: [exampleEmbed] });
+    }).catch(err => {
+      console.error(err)
+      interaction.editReply({ content: 'error: error accessing api 5', ephemeral: true });
+      currentlyBeingUsed = false;
     });
+  }).catch(err => {
+    console.error(err)
+    interaction.editReply({ content: 'error: error accessing api 6', ephemeral: true });
+    currentlyBeingUsed = false;
   });
 }
