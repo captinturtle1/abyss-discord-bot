@@ -32,7 +32,7 @@ export default async function check_profit(interaction, ddb) {
       realizedProfit: 0,
     };
     
-    await interaction.deferReply();
+    await interaction.reply({content: 'Calculating...', allowed_mentions: { users: [interaction.user.id]}});
     let user = interaction.user.id;
     let params = {
       Key: {
@@ -229,9 +229,9 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
           { name: 'Wallets checked', value: `${totalAddressArray.length}` },
 	      )
 	      .setTimestamp()
-	      .setFooter({ text: 'bot by captinturtle'});
+	      .setFooter({ text: 'bot by captinturtle', iconURL: 'https://cdn.discordapp.com/avatars/205967038986977280/0560eac6f0d23e31f966653046c4dd3d.png'});
         currentlyBeingUsed = false;
-        interaction.editReply({ content: `${userMention(interaction.user.id)}`, embeds: [exampleEmbed] });
+        interaction.editReply({ content: `${userMention(interaction.user.id)}`, embeds: [exampleEmbed]});
     }).catch(err => {
       console.error(err)
       interaction.editReply({ content: 'error: error accessing api 5', ephemeral: true });
