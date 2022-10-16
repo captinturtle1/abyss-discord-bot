@@ -13,8 +13,10 @@ const alchemyConfig = {
 const alchemy = new Alchemy(alchemyConfig);
 
 let currentlyBeingUsed = false;
+let alreadyWarned = false;
 
 export default async function check_profit(interaction, ddb) {
+  alreadyWarned = false;
   if (!/^0x[a-fA-F0-9]{40}$/.test(interaction.options.getString('contract_address'))) {
     console.log('invalid address provided');
     interaction.reply({content: 'Invalid addres provided', ephemeral: true});
@@ -72,7 +74,7 @@ export default async function check_profit(interaction, ddb) {
                 		  myLoop();
                 		}
                     i++;
-                	}, 1000 )
+                	}, 2500 )
                 }
                 myLoop();
               } else {
@@ -118,6 +120,10 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
       setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${value.transfers[i].hash}&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
+        if (response.status == 0 && alreadyWarned == false) {
+          interaction.followUp({ content: 'api being rate limited, results may not be accurate, try using slow mode', ephemeral: true });
+          alreadyWarned = true;
+        }
         console.log(response, i, value.transfers[i].hash);
         console.log(response.result.length);
         for (let j = 0; j < response.result.length; j++) {
@@ -149,7 +155,6 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
 }
 
 function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex) {
-
   interaction.editReply({ content: `Getting nfts in ${userAddress}`, ephemeral: true });
   // checks nfts that came into wallet
   alchemy.core.getAssetTransfers({
@@ -175,6 +180,10 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
       setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
+        if (response.status == 0 && alreadyWarned == false) {
+          interaction.followUp({ content: 'api being rate limited, results may not be accurate, try using slow mode', ephemeral: true });
+          alreadyWarned = true;
+        }
         for (let j = 0; j < response.result.length; j++) {
           
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
@@ -248,7 +257,9 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray) 
     .then(response => {
       profitTable.currentFloor = response.collections[0].floorAsk.price.amount.decimal
       profitTable.realizedProfit = profitTable.totalMoneyIn - (profitTable.buyInCost + profitTable.buyInGasFee + profitTable.mintCost + profitTable.mintGasFees);
-      profitTable.unrealizedProfit = profitTable.realizedProfit + (profitTable.currentlyHeld * profitTable.currentFloor);
+      if (profitTable.currentlyHeld > 0) {
+        profitTable.unrealizedProfit = profitTable.realizedProfit + (profitTable.currentlyHeld * profitTable.currentFloor);
+      }
       console.log(profitTable);
       const exampleEmbed = new EmbedBuilder()
 	      .setColor([15, 23, 42])
