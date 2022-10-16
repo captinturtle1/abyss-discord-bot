@@ -20,7 +20,6 @@ export default async function check_profit(interaction, ddb) {
     interaction.reply({content: 'Invalid addres provided', ephemeral: true});
   } else {
     alchemy.core.getCode(interaction.options.getString('contract_address')).then(async value => {
-      console.log(value);
       if (value == "0x") {
         console.log('address provided not a contract')
         interaction.reply({content: 'Address provided is not a contract', ephemeral: true});
@@ -73,7 +72,7 @@ export default async function check_profit(interaction, ddb) {
                 		  myLoop();
                 		}
                     i++;
-                	}, 10000 * (i + 1))
+                	}, 1000 )
                 }
                 myLoop();
               } else {
@@ -84,11 +83,13 @@ export default async function check_profit(interaction, ddb) {
             }
           });
         } else {
+          console.log("already in use");
           interaction.reply('Currently being used, try again in a bit.');
         }
       }
     }).catch(err => {
       console.log(err);
+      interaction.reply('error: error accessing api 7');
     });
   }
 }
@@ -107,19 +108,19 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
     category: ["erc721", "erc1155"],
   }).then( value => {
     console.log(value);
-    interaction.editReply({ content: `Got nfts out ${userAddress} alchemy`, ephemeral: true });
     // for each nft transfered in
+    if (value.transfers.length == 0) {
+      console.log("none tracked out");
+      getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
+    }
     for (let i = 0; i < value.transfers.length; i++) {
-
       // calls etherscan internal tx api for each transaction
       setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${value.transfers[i].hash}&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
-        console.log(response);
-        interaction.editReply({ content: `Got nfts out etherscan: ${i}`, ephemeral: true });
+        console.log(response, i, value.transfers[i].hash);
+        console.log(response.result.length);
         for (let j = 0; j < response.result.length; j++) {
-
-          interaction.editReply({ content: `NFTs out internal: ${j}, etherscan: ${i}, ${userAddress}`, ephemeral: true });
           // checks each internal tx to make sure its the one with the funds going to user wallet
           if (response.result[j].to == userAddress) {
             let soldInEth = response.result[j].value / 1000000000000000000;
@@ -127,19 +128,21 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
             profitTable.totalAmountSold += 1;
           };
         }
-        if (profitTable.totalAmountSold == value.transfers.length) {
+
+        console.log(profitTable.totalAmountSold, value.transfers.length);
+        console.log(i, value.transfers.length);
+        if (i == value.transfers.length-1) {
           console.log("done tracking out");
-          interaction.editReply({ content: `Done nfts out ${userAddress}`, ephemeral: true });
           getNftsIn(contractAddress, interaction, profitTable, totalAddressArray, userAddress, currentAddressIndex);
         }
       }).catch(err => {
-        console.error(err)
+        console.error(err);
         interaction.editReply({ content: 'error: error accessing api 1', ephemeral: true });
         currentlyBeingUsed = false;
       }); }, 500 * (i + 1));
     }
   }).catch(err => {
-    console.error(err)
+    console.error(err);
     interaction.editReply({ content: 'error: error accessing api 2', ephemeral: true });
     currentlyBeingUsed = false;
   });
@@ -156,17 +159,22 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
   }).then(value => {
-    interaction.editReply({ content: `Got nfts in ${userAddress}`, ephemeral: true });
     let checkedTxs = [];
+    if (value.transfers.length == 0) {
+      console.log("no tracking in");
+      console.log(currentAddressIndex, totalAddressArray.length-1);
+      if (currentAddressIndex == totalAddressArray.length-1){
+        console.log("done");
+        getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
+      }
+    }
     for (let i = 0; i < value.transfers.length; i++) {
       let blocknum = parseInt(value.transfers[i].blockNum, 16)
 
-      interaction.editReply({ content: `Getting nfts in tx: ${i} ${userAddress}`, ephemeral: true });
       // gets specific transaction details
       setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${userAddress}&startblock=${blocknum}&endblock=${blocknum}&page=1&offset=10&sort=desc&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
       .then(response => response.json())
       .then(response => {
-        interaction.editReply({ content: `Got nfts in tx: ${i} ${userAddress}`, ephemeral: true });
         for (let j = 0; j < response.result.length; j++) {
           
           // checks each tx to make sure it matches nft transfer tx to get around etherscan weird api
@@ -176,7 +184,6 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
             if (value.transfers[i].from == "0x0000000000000000000000000000000000000000") {
               // if minted
 
-              interaction.editReply({ content: `tx: ${i} is minted ${userAddress}`, ephemeral: true });
               if (checkedTxs.includes(response.result[j].hash) == false) {
                 let mintCost = response.result[j].value.toString() / 1000000000000000000;
                 let mintGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
@@ -188,7 +195,6 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
             } else {
               // if somewhere else
 
-              interaction.editReply({ content: `tx: ${i} is not minted ${userAddress}`, ephemeral: true });
               if (checkedTxs.includes(response.result[j].hash) == false) {
                 let secondaryCost = response.result[j].value / 1000000000000000000;
                 let buyinGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
@@ -210,34 +216,39 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
             console.log("done");
             getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
           }
-          //getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
         }
       }).catch(err => {
-        console.error(err)
+        console.error(err);
         interaction.editReply({ content: 'error: error accessing api 3', ephemeral: true });
         currentlyBeingUsed = false;
       }); }, 500 * (i + 1));
     }
   }).catch(err => {
-    console.error(err)
+    console.error(err);
     interaction.editReply({ content: 'error: error accessing api 4', ephemeral: true });
+    currentlyBeingUsed = false;
+  });
+
+  // gets current holding for address
+  alchemy.core.getTokenBalances(userAddress, [contractAddress]).then(value => {
+    let amountOwned = parseInt(value.tokenBalances[0].tokenBalance, 16)
+    profitTable.currentlyHeld += amountOwned;
+  }).catch(err => {
+    console.error(err);
+    interaction.editReply({ content: 'error: error accessing api 5', ephemeral: true });
     currentlyBeingUsed = false;
   });
 }
 
-function getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress) {
+function getFloor(contractAddress, interaction, profitTable, totalAddressArray) {
   interaction.editReply({ content: `Getting collection details for ${contractAddress}`, ephemeral: true });
   let options = {method: 'GET', headers: {accept: '*/*', 'x-api-key': `${process.env.RESERVOIR_KEY}`}};
   fetch(`https://api.reservoir.tools/collections/v5?id=${contractAddress}&includeTopBid=false&sortBy=allTimeVolume&limit=20`, options)
     .then(response => response.json())
     .then(response => {
-    profitTable.currentFloor = response.collections[0].floorAsk.price.amount.decimal
-    alchemy.core.getTokenBalances(userAddress, [contractAddress]).then(value => {
-      interaction.editReply({ content: `Calculating final numbers...`, ephemeral: true });
-      let amountOwned = parseInt(value.tokenBalances[0].tokenBalance, 16)
-      profitTable.currentlyHeld = amountOwned;
-      profitTable.unrealizedProfit = profitTable.currentlyHeld * profitTable.currentFloor;
+      profitTable.currentFloor = response.collections[0].floorAsk.price.amount.decimal
       profitTable.realizedProfit = profitTable.totalMoneyIn - (profitTable.buyInCost + profitTable.buyInGasFee + profitTable.mintCost + profitTable.mintGasFees);
+      profitTable.unrealizedProfit = profitTable.realizedProfit + (profitTable.currentlyHeld * profitTable.currentFloor);
       console.log(profitTable);
       const exampleEmbed = new EmbedBuilder()
 	      .setColor([15, 23, 42])
@@ -252,7 +263,7 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
           { name: 'Total secondary', value: `${profitTable.totalAmountBoughtSecondary}`, inline: true },
           { name: 'Secondary cost', value: `${profitTable.buyInCost.toPrecision(5)}`, inline: true },
           { name: 'Secondary fee', value: `${profitTable.buyInGasFee.toPrecision(5)}`, inline: true },
-          { name: 'ETH from sales', value: `${profitTable.totalMoneyIn}`, inline: true },
+          { name: 'ETH from sales', value: `${profitTable.totalMoneyIn.toPrecision(5)}`, inline: true },
           { name: 'Amount sold', value: `${profitTable.totalAmountSold}`, inline: true },
           { name: 'Realized', value: `${profitTable.realizedProfit.toPrecision(5)}`, inline: true },
           { name: 'Floor', value: `${profitTable.currentFloor}`, inline: true },
@@ -266,13 +277,9 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray, 
         currentlyBeingUsed = false;
         interaction.editReply({ content: 'done', ephemeral: true });
         interaction.followUp({ content: `${userMention(interaction.user.id)}`, embeds: [exampleEmbed], allowed_mentions: { users: [interaction.user.id]}});
-    }).catch(err => {
-      console.error(err)
-      interaction.editReply({ content: 'error: error accessing api 5', ephemeral: true });
-      currentlyBeingUsed = false;
-    });
+    
   }).catch(err => {
-    console.error(err)
+    console.error(err);
     interaction.editReply({ content: 'error: error accessing api 6', ephemeral: true });
     currentlyBeingUsed = false;
   });
