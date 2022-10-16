@@ -15,66 +15,81 @@ const alchemy = new Alchemy(alchemyConfig);
 let currentlyBeingUsed = false;
 
 export default async function check_profit(interaction, ddb) {
-  if (!currentlyBeingUsed) {
-    currentlyBeingUsed = true;
-  
-    let profitTable = {
-      totalMoneyIn: 0,
-      mintCost: 0,
-      mintGasFees: 0,
-      buyInCost: 0,
-      buyInGasFee: 0,
-      totalAmountSold: 0,
-      totalAmountMinted: 0,
-      totalAmountBoughtSecondary: 0,
-      currentlyHeld: 0,
-      currentFloor: 0,
-      unrealizedProfit: 0,
-      realizedProfit: 0,
-    };
-    
-    await interaction.reply({content: 'Calculating...', allowed_mentions: { users: [interaction.user.id]}, ephemeral: true});
-    let user = interaction.user.id;
-    let params = {
-      Key: {
-       "userId": {S: `${user}`}, 
-      },
-      TableName: "userAddresses"
-    };
-    interaction.editReply({ content: 'Getting wallets', ephemeral: true });
-    ddb.getItem(params, function(err, data) {
-      if (err) {
-        console.log("Error", err);
-        interaction.editReply({ content: 'error: unable to access wallets', ephemeral: true });
-        currentlyBeingUsed = false;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(interaction.options.getString('contract_address'))) {
+    console.log('invalid address provided');
+    interaction.reply({content: 'Invalid addres provided', ephemeral: true});
+  } else {
+    alchemy.core.getCode(interaction.options.getString('contract_address')).then(async value => {
+      console.log(value);
+      if (value == "0x") {
+        console.log('address provided not a contract')
+        interaction.reply({content: 'Address provided is not a contract', ephemeral: true});
       } else {
-        
-        if (Object.keys(data).length !== 0) {
-          let justAddress = data.Item.addresses.S;
-          let totalAddressArray = justAddress.split(',')
-          console.log("Success", totalAddressArray);
-          interaction.editReply({ content: `Got ${totalAddressArray.length} wallet(s)`, ephemeral: true });
-          let i = 0;
-          function myLoop() {
-          	setTimeout(function() {
-          		console.log("loop!")
-              getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
-          		if (i < totalAddressArray.length-1) {
-          		  myLoop();
-          		}
-              i++;
-          	}, 10000 * (i + 1))
-          }
-          myLoop();
+        if (!currentlyBeingUsed) {
+          currentlyBeingUsed = true;
+          
+          let profitTable = {
+            totalMoneyIn: 0,
+            mintCost: 0,
+            mintGasFees: 0,
+            buyInCost: 0,
+            buyInGasFee: 0,
+            totalAmountSold: 0,
+            totalAmountMinted: 0,
+            totalAmountBoughtSecondary: 0,
+            currentlyHeld: 0,
+            currentFloor: 0,
+            unrealizedProfit: 0,
+            realizedProfit: 0,
+          };
+
+          await interaction.reply({content: 'Calculating...', allowed_mentions: { users: [interaction.user.id]}, ephemeral: true});
+          let user = interaction.user.id;
+          let params = {
+            Key: {
+             "userId": {S: `${user}`}, 
+            },
+            TableName: "userAddresses"
+          };
+          interaction.editReply({ content: 'Getting wallets', ephemeral: true });
+          ddb.getItem(params, function(err, data) {
+            if (err) {
+              console.log("Error", err);
+              interaction.editReply({ content: 'error: unable to access wallets', ephemeral: true });
+              currentlyBeingUsed = false;
+            } else {
+
+              if (Object.keys(data).length !== 0) {
+                let justAddress = data.Item.addresses.S;
+                let totalAddressArray = justAddress.split(',')
+                console.log("Success", totalAddressArray);
+                interaction.editReply({ content: `Got ${totalAddressArray.length} wallet(s)`, ephemeral: true });
+                let i = 0;
+                function myLoop() {
+                	setTimeout(function() {
+                		console.log("loop!")
+                    getNftsOut(interaction, totalAddressArray, profitTable, totalAddressArray[i].toLowerCase(), i);
+                		if (i < totalAddressArray.length-1) {
+                		  myLoop();
+                		}
+                    i++;
+                	}, 10000 * (i + 1))
+                }
+                myLoop();
+              } else {
+                console.log('no wallets found');
+                interaction.editReply({ content: 'error: no wallets found', ephemeral: true });
+                currentlyBeingUsed = false;
+              }
+            }
+          });
         } else {
-          console.log('no wallets found');
-          interaction.editReply({ content: 'error: no wallets found', ephemeral: true });
-          currentlyBeingUsed = false;
+          interaction.reply('Currently being used, try again in a bit.');
         }
       }
+    }).catch(err => {
+      console.log(err);
     });
-  } else {
-    await interaction.reply('Currently being used, try again in a bit.');
   }
 }
 
