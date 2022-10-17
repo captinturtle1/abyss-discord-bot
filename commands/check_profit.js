@@ -122,6 +122,7 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
     excludeZeroValue: false,
     category: ["erc721", "erc1155"],
     }).then( value => {
+      let checkedTxs = [];
       console.log('alchemy transfers out', value);
       // for each nft transfered in
       if (value.transfers.length == 0) {
@@ -131,22 +132,25 @@ function getNftsOut(interaction, totalAddressArray, profitTable, userAddress, cu
       }
       for (let i = 0; i < value.transfers.length; i++) {
         // calls etherscan internal tx api for each transaction
-        console.log(value.transfers[i].hash);
         setTimeout(() => { fetch(`https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${value.transfers[i].hash}&apikey=C3BG3QFC5DEIKKUTNC6QAF1J8NJA759ND9`)
         .then(response => response.json())
         .then(async response => {
+          console.log(value.transfers[i].hash);
           console.log('etherscan transfers out: ', response, ', transfer #', i);
           if (response.result == 'Max rate limit reached' && alreadyWarned == false) {
             await interaction.followUp({ content: 'api being rate limited, results may not be accurate', ephemeral: true });
             alreadyWarned = true;
           }
-          for (let j = 0; j < response.result.length; j++) {
-            // checks each internal tx to make sure its the one with the funds going to user wallet
-            if (response.result[j].to == userAddress) {
-              let soldInEth = response.result[j].value / 1000000000000000000;
-              profitTable.totalMoneyIn += soldInEth;
-              profitTable.totalAmountSold += 1;
-            };
+          if (checkedTxs.includes(value.transfers[i].hash) == false) {
+            checkedTxs.push(value.transfers[i].hash);
+            for (let j = 0; j < response.result.length; j++) {
+              // checks each internal tx to make sure its the one with the funds going to user wallet
+              if (response.result[j].to == userAddress) {
+                  let soldInEth = response.result[j].value / 1000000000000000000;
+                  profitTable.totalMoneyIn += soldInEth;
+                  profitTable.totalAmountSold += 1;
+              }
+            }
           }
           if (i == value.transfers.length-1) {
             console.log("done tracking out");
@@ -184,11 +188,8 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
       if (value.transfers.length == 0) {
         console.log("no tracking in");
         console.log(currentAddressIndex, totalAddressArray.length-1);
-        if (currentAddressIndex == totalAddressArray.length-1){
-          console.log("done");
-          resolve(profitTable);
-          //getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
-        }
+        resolve(profitTable);
+        //getFloor(contractAddress, interaction, profitTable, totalAddressArray, userAddress);
       }
       for (let i = 0; i < value.transfers.length; i++) {
         let blocknum = parseInt(value.transfers[i].blockNum, 16)
@@ -212,24 +213,24 @@ function getNftsIn(contractAddress, interaction, profitTable, totalAddressArray,
                 // if minted
 
                 if (checkedTxs.includes(response.result[j].hash) == false) {
+                  checkedTxs.push(response.result[j].hash);
                   let mintCost = response.result[j].value.toString() / 1000000000000000000;
                   let mintGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
                   profitTable.mintGasFees += mintGasCost;
                   profitTable.mintCost += mintCost;
                 }
                 profitTable.totalAmountMinted += 1;
-                checkedTxs.push(response.result[j].hash);
               } else {
                 // if somewhere else
 
                 if (checkedTxs.includes(response.result[j].hash) == false) {
+                  checkedTxs.push(response.result[j].hash);
                   let secondaryCost = response.result[j].value / 1000000000000000000;
                   let buyinGasCost = response.result[j].gasPrice * response.result[j].gasUsed / 1000000000000000000;
                   profitTable.buyInGasFee += buyinGasCost;
                   profitTable.buyInCost += secondaryCost;
                 }
                 profitTable.totalAmountBoughtSecondary += 1;
-                checkedTxs.push(response.result[j].hash);
               };
             } else {
               console.log("no match...");
@@ -292,11 +293,11 @@ function getFloor(contractAddress, interaction, profitTable, totalAddressArray) 
             { name: 'Total secondary', value: `${profitTable.totalAmountBoughtSecondary}`, inline: true },
             { name: 'Secondary cost', value: `${profitTable.buyInCost.toPrecision(5)}`, inline: true },
             { name: 'Secondary fee', value: `${profitTable.buyInGasFee.toPrecision(5)}`, inline: true },
-            { name: 'ETH from sales', value: `${profitTable.totalMoneyIn.toPrecision(5)}`, inline: true },
             { name: 'Amount sold', value: `${profitTable.totalAmountSold}`, inline: true },
+            { name: 'ETH from sales', value: `${profitTable.totalMoneyIn.toPrecision(5)}`, inline: true },
             { name: 'Realized', value: `${profitTable.realizedProfit.toPrecision(5)}`, inline: true },
-            { name: 'Floor', value: `${profitTable.currentFloor}`, inline: true },
             { name: 'Holding', value: `${profitTable.currentlyHeld}`, inline: true },
+            { name: 'Floor', value: `${profitTable.currentFloor.toPrecision(5)}`, inline: true },
             { name: 'Unrealized', value: `${profitTable.unrealizedProfit.toPrecision(5)}`, inline: true },
             { name: '\u200B', value: '\u200B' },
             { name: 'Wallets checked', value: `${totalAddressArray.length}` },
