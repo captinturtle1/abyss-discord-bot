@@ -94,15 +94,15 @@ export default async function check_profit(interaction, ddb) {
                 currentlyBeingUsed = false;
                 // final reply
                 await interaction.editReply({ content: 'done', ephemeral: true });
-                await interaction.followUp({ content: `${userMention(interaction.user.id)}`, embeds: [resultFinal], allowed_mentions: { users: [interaction.user.id]}});
+                await interaction.editReply({ embeds: [resultFinal], ephemeral: true});
               }
             }
           });
         }
       }
-    }).catch(err => {
+    }).catch(async err => {
       console.log(err);
-      interaction.reply('error: error accessing api 7');
+      await interaction.editReply({ content: 'error: error accessing api 7', ephemeral: true });
     });
   }
 }
@@ -164,9 +164,9 @@ function getNftsOut(interaction, profitTable, userAddress, contractAddress) {
           currentlyBeingUsed = false;
         }); }, 250 * (i + 1) );
       }
-    }).catch(err => {
+    }).catch(async err => {
       console.error(err);
-      interaction.editReply({ content: 'error: error accessing api 2', ephemeral: true });
+      await interaction.editReply({ content: 'error: error accessing api 2', ephemeral: true });
       currentlyBeingUsed = false;
     });
   });
@@ -203,7 +203,7 @@ function getNftsIn(interaction, profitTable, userAddress, contractAddress) {
           // rate limit check
           if (response.result == 'Max rate limit reached' && alreadyWarned == false) {
             console.log('rate limited');
-            await interaction.followUp({ content: 'api being rate limited, results may not be accurate, try using slow mode', ephemeral: true });
+            await interaction.followUp({ content: 'api being rate limited, results may not be accurate, try again if results aren\'t right', ephemeral: true });
             alreadyWarned = true;
           }
           // runs for each tx
@@ -287,7 +287,7 @@ function getFloor(interaction, profitTable, totalAddressArray, contractAddress) 
 	        .setColor([15, 23, 42])
 	        .setTitle(response.collections[0].name)
           .setURL(`https://opensea.io/collection/${response.collections[0].slug}`)
-          .setAuthor({ name: 'Profit calculator', iconURL: 'https://www.abyssfnf.com/logo.png' })
+          .setAuthor({ name: 'Profit/Loss Calculator' })
 	        .setThumbnail(response.collections[0].image)
 	        .addFields(
 	        	{ name: 'Total minted', value: `${profitTable.totalAmountMinted}`, inline: true },

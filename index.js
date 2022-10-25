@@ -13,7 +13,7 @@ import calculate_gas_legacy from './commands/calculate_gas_legacy.js';
 import calculate_gas from './commands/calculate_gas.js';
 
 // init aws
-AWS.config.update({region: 'us-east-2'});
+AWS.config.update({region: 'us-west-1'});
 const ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 
 // init dotenv
